@@ -1,5 +1,5 @@
 using Printf
-#using CUDA
+using CUDA
 using Oceananigans
 include("utils.jl")
 
@@ -7,7 +7,7 @@ include("utils.jl")
 const stop_time        = 100
 const Δt               = 1
 
-ARCH = CPU()#has_cuda_gpu() ? GPU() : CPU()
+ARCH = has_cuda_gpu() ? GPU() : CPU()
 
 experiment = parse_experiment("experiments_0")
 @printf(" ▷ Experiment: '%s' ◁ \n", experiment)
