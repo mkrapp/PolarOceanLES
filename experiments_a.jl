@@ -7,20 +7,20 @@ using Oceananigans.TurbulenceClosures
 include("utils.jl")
 
 # model runtime parameters: number of hours, grid size, filename, etc
-const stop_time        = 72hours
+const stop_time        = 30minutes
 const Δt               = 1seconds
-const max_Δt           = 10seconds
-const Δt_output_fld    = 10minutes#1minutes
+const max_Δt           = 1seconds
+const Δt_output_fld    = 5seconds#1minutes
 
 ARCH = has_cuda_gpu() ? GPU() : CPU()
 
 experiment = parse_experiment("experiments_a")
-@printf(" ▷ Experiment: '%s' ◁ \n", experiment)
+@printf(" ▷▷▷ Experiment: '%s' ◁◁◁ \n", experiment)
 
 # GRID DIMENSIONS
-const Nz = 32
-const Nx = 32
-const Ny = 32
+const Nz = 50
+const Nx = 25
+const Ny = 25
 # GRID EXTENT
 const Lz = 10meters
 const Lx = 10meters
@@ -29,8 +29,8 @@ const Ly = 10meters
 z₀ = 0meters # depth of seawater parcel
 
 # Z-GRID PROPERTIES (refinement of Δz at ice-ocean interface)
-const refinement = 1    # controls spacing near surface (higher means finer spaced)
-const stretching = 1e40 # controls rate of stretching at bottom
+const refinement = 1.2 # controls spacing near surface (higher means finer spaced)
+const stretching = 12  # controls rate of stretching at bottom
 
 z_faces = z_levels(Nz,Lz,z₀,refinement,stretching)
 
@@ -60,11 +60,6 @@ const pgrad = - f₀ * u₀
 @inline pressure_gradient(x, y, z, t) = pgrad
 u_forcing = Forcing(pressure_gradient)
 
-# Cooling at surface
-@inline T_top(x,y,t,T,p) = T + p.ΔT * exp(-(x-Lx/2)^2 -(y-Ly/2)^2)
-
-T_bcs = FieldBoundaryConditions(top = ValueBoundaryCondition(T_top, field_dependencies=:T, parameters=(;ΔT=-0.5)))
-
 buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = α, haline_contraction = β))
 
 coriolis = FPlane(f=f₀)
@@ -78,7 +73,6 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             tracers = (:T, :S),
                             coriolis = coriolis,
                             closure = closure,
-                            boundary_conditions = (;T=T_bcs),
                             forcing = (;u=u_forcing))
 println(model)
 
@@ -89,9 +83,9 @@ println(model)
 
 # INITIAL CONDITIONS
 # Temperature initial condition: a stable gradient with random noise superposed.
-@inline Tᵢ(x, y, z) = T₀ - 0.01 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+@inline Tᵢ(x, y, z) = T₀ - 9.5e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z) - (z > -1 ? exp(-(x-Lx/2)^2 -(y-Ly/2)^2) : 0.0)
 # Salinity initial condition: a stable gradient with random noise superposed.
-@inline Sᵢ(x, y, z) = S₀ - 0.01 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+@inline Sᵢ(x, y, z) = S₀ - 4e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
 # Velocity initial condition: random noise scaled by the friction velocity.
 @inline vᵢ(x, y, z) = 1e-5 * Ξ(z)
 @inline uᵢ(x, y, z) = u₀ + 1e-5 * Ξ(z)
