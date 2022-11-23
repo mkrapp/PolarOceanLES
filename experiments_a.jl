@@ -7,10 +7,10 @@ using Oceananigans.TurbulenceClosures
 include("utils.jl")
 
 # model runtime parameters: number of hours, grid size, filename, etc
-const stop_time        = 30minutes
+const stop_time        = 5hours
 const Δt               = 1seconds
 const max_Δt           = 1seconds
-const Δt_output_fld    = 5seconds#1minutes
+const Δt_output_fld    = 5seconds
 
 ARCH = has_cuda_gpu() ? GPU() : CPU()
 
@@ -83,14 +83,14 @@ println(model)
 
 # INITIAL CONDITIONS
 # Temperature initial condition: a stable gradient with random noise superposed.
-@inline Tᵢ(x, y, z) = T₀ - 9.5e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z) - (z > -1 ? exp(-(x-Lx/2)^2 -(y-Ly/2)^2) : 0.0)
+const z_top = CUDA.@allowscalar model.grid.zᵃᵃᶜ[model.grid.Nz]
+@inline Tᵢ(x, y, z) = T₀ - 9.5e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z) - (z == z_top ? exp(-(x-Lx/2)^2 -(y-Ly/2)^2) : 0.0)
 # Salinity initial condition: a stable gradient with random noise superposed.
 @inline Sᵢ(x, y, z) = S₀ - 4e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
 # Velocity initial condition: random noise scaled by the friction velocity.
-@inline vᵢ(x, y, z) = 1e-5 * Ξ(z)
-@inline uᵢ(x, y, z) = u₀ + 1e-5 * Ξ(z)
+@inline uᵢ(x, y, z) = 1e-5 * Ξ(z)
 # `set!` the `model` fields using functions or constants:
-set!(model, v=vᵢ, u=uᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ)
+set!(model, v=uᵢ, u=uᵢ, w=uᵢ, T=Tᵢ, S=Sᵢ)
 
 # define simulation with time stepper, and callbacks for some runtime info
 simulation = Simulation(model, Δt =  Δt, stop_time=stop_time)
@@ -98,7 +98,7 @@ wizard = TimeStepWizard(cfl=0.5, max_change=1.1, max_Δt=max_Δt)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 
 # Print a progress message
-progress_message(sim) = @printf(" ▷ Iteration: %04d, time: %s, Δt: %s, wall time: %s\n\t max(|w|) = %.1e ms⁻¹, min(T) = %.3f °C, max(T) %.3f °C, min(S) = %.2f g kg⁻¹, max(S) %.2f g kg⁻¹\n",
+progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall time: %s\n\t max(|w|) = %.1e ms⁻¹, min(T) = %.3f °C, max(T) %.3f °C, min(S) = %.2f g kg⁻¹, max(S) %.2f g kg⁻¹\n",
                                 iteration(sim), prettytime(sim), prettytime(sim.Δt),prettytime(sim.run_wall_time),
                                 maximum(abs, sim.model.velocities.w),
                                 minimum(sim.model.tracers.T), maximum(sim.model.tracers.T),
