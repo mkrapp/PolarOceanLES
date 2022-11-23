@@ -60,6 +60,11 @@ const pgrad = - f₀ * u₀
 @inline pressure_gradient(x, y, z, t) = pgrad
 u_forcing = Forcing(pressure_gradient)
 
+# Cooling at surface
+@inline T_top(x,y,t,T,p) = T + p.ΔT * exp(-(x-Lx/2)^2 -(y-Ly/2)^2)
+
+T_bcs = FieldBoundaryConditions(top = ValueBoundaryCondition(T_top, field_dependencies=:T, parameters=(;ΔT=-0.5)))
+
 buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = α, haline_contraction = β))
 
 coriolis = FPlane(f=f₀)
@@ -73,6 +78,7 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             tracers = (:T, :S),
                             coriolis = coriolis,
                             closure = closure,
+                            boundary_conditions = (;T=T_bcs),
                             forcing = (;u=u_forcing))
 println(model)
 
