@@ -65,3 +65,27 @@ A basic experiment similar to A but where we also add a drag to the surface, mim
 julia experiments_b.jl -e <path and prefix for this experiment>
 ```
 
+## Experiments C
+
+*Coming soon...*
+
+Similar to B with melting at the ice-ocean interface.
+
+## Experiments D
+
+*Coming soon...*
+
+A tilted ocean box with drag at the ice-ocean interface.
+
+## Experiments E
+
+*Coming soon...*
+
+An open ocean box with imposed wind stress, cooling, and evaporation at the surface.
+
+## Experiments F
+
+*Coming soon...*
+
+A bigger open ocean box like E but with a circular sea ice-free mask imposed. Fluxes are basically zero where the surface is masked by "sea ice".
+
