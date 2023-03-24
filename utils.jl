@@ -4,11 +4,15 @@ function parse_experiment(experiment)
     s = ArgParseSettings()
     @add_arg_table s begin
         "--experiment", "-e"
-            help = "starting value of array"
+            help = "name of experiment"
             arg_type = String
             default = experiment
+        "--path", "-p"
+            help = "path to output directory"
+            arg_type = String
+            default = "./"
     end
-    return parse_args(s)["experiment"]
+    return parse_args(s)
 end
 
 function z_levels(Nz,Lz,z₀,refinement,stretching)
