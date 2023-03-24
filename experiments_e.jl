@@ -14,7 +14,8 @@ const Δt_output_fld    = 20seconds
 
 ARCH = has_cuda_gpu() ? GPU() : CPU()
 
-experiment = parse_experiment("experiments_e")
+parsed_args = parse_experiment("experiments_e")
+experiment = parsed_args["experiment"]
 @printf(" ▷▷▷ Experiment: '%s' ◁◁◁ \n", experiment)
 
 # GRID DIMENSIONS
