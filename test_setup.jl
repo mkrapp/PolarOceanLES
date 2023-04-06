@@ -1,6 +1,7 @@
 using Printf
 using CUDA
 using Oceananigans
+using Oceanostics
 using TOML
 include("utils.jl")
 
@@ -45,8 +46,12 @@ progress_message(sim) = @printf(" ▷ Iteration: %05d, time: %s, Δt: %s, wall t
 
 simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
-# OUTPUTS
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities), filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(10))
+# OUTPUT DIAGNOSTICS
+tke = (; TKE = Field(TurbulentKineticEnergy(model)))
+sp  = (; SPY = Field(YShearProductionRate(model)))
+
+outputs = merge(model.velocities, sp, tke)
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(10))
 
 run!(simulation)
 
