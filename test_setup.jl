@@ -1,27 +1,33 @@
 using Printf
 using CUDA
 using Oceananigans
+using TOML
 include("utils.jl")
 
+config = TOML.parsefile(ARGS[1])
+
 # model runtime parameters: number of hours, grid size, filename, etc
-const stop_time        = 100
-const Δt               = 1
+config_sim = config["simulation"]
+const stop_time = parse_units(config_sim["stop_time"])
+const Δt        = parse_units(config_sim["Δt"])
 
 ARCH = has_cuda_gpu() ? GPU() : CPU()
 
-experiment = parse_experiment("experiments_0")
+path       = config["path"]
+experiment = config["experiment"]
 @printf(" ▷ Experiment: '%s' ◁ \n", experiment)
 
+config_grid = config["grid"]
 # GRID DIMENSIONS
-const Nz = 1
-const Nx = 1
-const Ny = 1
+const Nx = config_grid["Nx"]
+const Ny = config_grid["Ny"]
+const Nz = config_grid["Nz"]
 # GRID EXTENT
-const Lz = 1
-const Lx = 1
-const Ly = 1
+const Lx = parse_units(config_grid["Lx"])
+const Ly = parse_units(config_grid["Ly"])
+const Lz = parse_units(config_grid["Lz"])
 
-grid = RectilinearGrid(ARCH; size=(1, 1, 1), x=(0, Lx), y=(0,Ly), z=(0,Lz))
+grid = RectilinearGrid(ARCH; size=(Nx, Ny, Nz), x=(0, Lx), y=(0,Ly), z=(0,Lz))
 println(grid)
 
 # MODEL
@@ -40,7 +46,7 @@ progress_message(sim) = @printf(" ▷ Iteration: %05d, time: %s, Δt: %s, wall t
 simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
 # OUTPUTS
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities), filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(10))
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities), filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(10))
 
 run!(simulation)
 

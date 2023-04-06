@@ -14,12 +14,12 @@ julia> Pkg.add("Oceananigans")
 julia> Pkg.add("ArgParse")
 ```
 
-## Experiments 0
+## Test setup
 
 This is just a small (but full) non-hydrostatic ocean model on a 1x1x1 rectilinear grid, to test if everything works.
 
 ```
-julia experiments_0.jl
+julia test_setup.jl test_setup.toml
 ```
 
 Output:
