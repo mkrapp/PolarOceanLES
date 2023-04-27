@@ -2,31 +2,35 @@ using Printf
 using CUDA
 using Oceananigans
 using Oceananigans.BuoyancyModels: g_Earth
-using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilometers, meters
 using Oceananigans.TurbulenceClosures
+using TOML
 include("utils.jl")
 
+config = TOML.parsefile(ARGS[1])
+
 # model runtime parameters: number of hours, grid size, filename, etc
-const stop_time        = 5hours
-const Δt               = 1seconds
-const max_Δt           = 1seconds
-const Δt_output_fld    = 5seconds
+sim_params = config["simulation"]
+const stop_time     = parse_units(sim_params["stop_time"])
+const Δt            = parse_units(sim_params["Δt"])
+const max_Δt        = parse_units(sim_params["max_Δt"])
+const Δt_output_fld = parse_units(sim_params["Δt_output_fld"])
 
 ARCH = has_cuda_gpu() ? GPU() : CPU()
 
-experiment = parse_experiment("experiments_a")
+path       = config["path"]
+experiment = config["experiment"]
 @printf(" ▷▷▷ Experiment: '%s' ◁◁◁ \n", experiment)
 
-# GRID DIMENSIONS
-const Nz = 50
-const Nx = 25
-const Ny = 25
-# GRID EXTENT
-const Lz = 10meters
-const Lx = 10meters
-const Ly = 10meters
+# GRID DIMENSIONS & EXTENT
+grid_params = config["grid"]
+const Nx = grid_params["Nx"]
+const Ny = grid_params["Ny"]
+const Nz = grid_params["Nz"]
+const Lx = parse_units(grid_params["Lx"])
+const Ly = parse_units(grid_params["Ly"])
+const Lz = parse_units(grid_params["Lz"])
 
-z₀ = 0meters # depth of seawater parcel
+const z₀ = parse_units(grid_params["z₀"])
 
 # Z-GRID PROPERTIES (refinement of Δz at ice-ocean interface)
 const refinement = 1.2 # controls spacing near surface (higher means finer spaced)
@@ -44,21 +48,18 @@ println(grid)
 
 # MODEL
 # Far-field values
-const u₀ = 0.014    # far field velocity                 m s⁻¹
-const T₀ = -1.9     # far field temperature              °C
-const S₀ = 34.5     # far field salinity                 g kg⁻¹
+far_field = config["far-field values"]
+const u₀ = far_field["V∞"]
+const T₀ = far_field["T∞"]
+const S₀ = far_field["S∞"]
 # Parameters
-const κₜ = 1.4e-7   # molecular diffusivity of heat      m² s⁻¹
-const κₛ = 1.3e-9   # molecular diffusivity of salt      m² s⁻¹
-const ν  = 2.0e-6   # molecular viscosity                m² s⁻¹
-const α  = 3.8e-5   # thermal expansion coefficient      °C⁻¹
-const β  = 7.8e-4   # haline expansion coefficient       kg g⁻¹
-const f₀ = -1.37e-4 # Coriolis parameter (for 70°S)      rad s⁻¹
-
-# Far-field forcing from constant pressure gradient
-const pgrad = - f₀ * u₀
-@inline pressure_gradient(x, y, z, t) = pgrad
-u_forcing = Forcing(pressure_gradient)
+params = config["physical parameters"]
+const κₜ = params["κₜ"]
+const κₛ = params["κₛ"]
+const ν  = params["ν"]
+const α  = params["α"]
+const β  = params["β"]
+const f₀ = params["f₀"]
 
 buoyancy = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = α, haline_contraction = β))
 
@@ -72,8 +73,7 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             timestepper = :RungeKutta3,
                             tracers = (:T, :S),
                             coriolis = coriolis,
-                            closure = closure,
-                            forcing = (;u=u_forcing))
+                            closure = closure)
 println(model)
 
 # SIMULATION
@@ -90,7 +90,7 @@ const z_top = CUDA.@allowscalar model.grid.zᵃᵃᶜ[model.grid.Nz]
 # Velocity initial condition: random noise scaled by the friction velocity.
 @inline uᵢ(x, y, z) = 1e-5 * Ξ(z)
 # `set!` the `model` fields using functions or constants:
-set!(model, v=uᵢ, u=uᵢ, w=uᵢ, T=Tᵢ, S=Sᵢ)
+set!(model, v=uᵢ, u=u₀, w=uᵢ, T=Tᵢ, S=Sᵢ)
 
 # define simulation with time stepper, and callbacks for some runtime info
 simulation = Simulation(model, Δt =  Δt, stop_time=stop_time)
@@ -107,7 +107,7 @@ progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall t
 simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
 # OUTPUTS
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities, model.tracers), filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld))
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities, model.tracers), filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld))
 
 run!(simulation)
 

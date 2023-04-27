@@ -18,7 +18,7 @@ julia> Pkg.add("ArgParse")
 
 This is just a small (but full) non-hydrostatic ocean model on a 1x1x1 rectilinear grid, to test if everything works.
 
-```
+```bash
 julia test_setup.jl test_setup.toml
 ```
 
@@ -51,17 +51,17 @@ NonhydrostaticModel{GPU, RectilinearGrid}(time = 0 seconds, iteration = 0)
 
 ## Experiments A
 
-A basic experiment where we cool the surface of a 10mx10mx10m ocean box.
+A basic experiment where we simulate the cooling of a surface of a 10mx10mx10m ocean box for 5 hours.
 
-```
-julia experiments_a.jl -e <path and prefix for this experiment>
+```bash
+julia experiments_a.jl experiments_a.toml
 ```
 
 ## Experiments B
 
 A basic experiment similar to A but where we also add a drag to the surface, mimicking a solid ice interface at the top of the 10mx10mx10m ocean box.
 
-```
+```bash
 julia experiments_b.jl -e <path and prefix for this experiment>
 ```
 
