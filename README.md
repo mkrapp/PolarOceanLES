@@ -51,7 +51,7 @@ NonhydrostaticModel{GPU, RectilinearGrid}(time = 0 seconds, iteration = 0)
 
 ## Experiments A
 
-A basic experiment where we simulate the cooling of a surface of a 10mx10mx10m ocean box for 5 hours.
+A basic experiment where we simulate the cooling of a surface of a 10mx10mx10m ocean box for 5 hours. It is initialized with a far-field velocity of 1.4 cm/s, a far-field temperature of -1.9°C (and $\partial T/\partial z$ = 9.5e-4 °C/m) and a salinity of 34.5 g/kg (and $\partial S/\partial z$ = 4.e-4 g/kg/m).
 
 ```bash
 julia experiments_a.jl experiments_a.toml
@@ -59,33 +59,27 @@ julia experiments_a.jl experiments_a.toml
 
 ## Experiments B
 
-A basic experiment similar to A but where we also add a drag to the surface, mimicking a solid ice interface at the top of the 10mx10mx10m ocean box.
+A basic experiment similar to A but instead of surface cooling we apply a surface drag, mimicking a solid ice interface (such as sea ice cover or an ice shelf) at the top of the 10mx10mx10m ocean box. It simulates 5 hours.
 
 ```bash
-julia experiments_b.jl -e <path and prefix for this experiment>
+julia experiments_b.jl experiments_b.toml
 ```
 
 ## Experiments C
 
-*Coming soon...*
+Like B but only a slice in the x-z plane, without Coriolis. And only buoyancy as a tracer (the combined effect of temperature and salinity variations due to gravity). Top drag follows Monin-Obukhov theory.
 
-Similar to B with melting at the ice-ocean interface.
+```bash
+julia experiments_c.jl experiments_c.toml
+```
 
-## Experiments D
 
-*Coming soon...*
-
-A tilted ocean box with drag at the ice-ocean interface.
-
-## Experiments E
+## Other experiments
 
 *Coming soon...*
 
-An open ocean box with imposed wind stress, cooling, and evaporation at the surface.
-
-## Experiments F
-
-*Coming soon...*
-
-A bigger open ocean box like E but with a circular sea ice-free mask imposed. Fluxes are basically zero where the surface is masked by "sea ice".
+- [ ] Similar to B with melting at the ice-ocean interface.
+- [ ] A tilted ocean box with drag at the ice-ocean interface.
+- [ ] An open ocean box with imposed wind stress, cooling, and evaporation at the surface.
+- [ ] A bigger open ocean box like E but with a circular sea ice-free mask imposed. Fluxes are basically zero where the surface is masked by "sea ice".
 
