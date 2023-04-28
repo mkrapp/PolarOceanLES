@@ -11,7 +11,7 @@ julia> using Pkg
 
 julia> Pkg.add("Oceananigans")
 
-julia> Pkg.add("ArgParse")
+julia> Pkg.add("Oceanostics")
 ```
 
 ## Test setup
@@ -59,7 +59,7 @@ julia experiments_a.jl experiments_a.toml
 
 ## Experiments B
 
-A basic experiment similar to A but instead of surface cooling we apply a surface drag, mimicking a solid ice interface (such as sea ice cover or an ice shelf) at the top of the 10mx10mx10m ocean box. It simulates 5 hours.
+A basic experiment similar to A but instead of surface cooling we apply a surface drag, mimicking a solid ice interface (such as sea ice cover or an ice shelf) at the top of the 10mx10mx10m ocean box. At the bottom the velocity fields are relaxed towards their far-field values (i.e., a "sponge layer"). The simulation length is 2 days.
 
 ```bash
 julia experiments_b.jl experiments_b.toml

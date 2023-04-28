@@ -4,6 +4,7 @@ using Oceananigans
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilometers, meters
 using Oceananigans.TurbulenceClosures
+using Oceanostics
 using TOML
 include("utils.jl")
 
@@ -30,14 +31,13 @@ const Nz = grid_params["Nz"]
 const Lx = parse_units(grid_params["Lx"])
 const Ly = parse_units(grid_params["Ly"])
 const Lz = parse_units(grid_params["Lz"])
+# Z-GRID PROPERTIES (refinement of Δz at ice-ocean interface)
+const refinement = grid_params["refinement"]
+const stretching = grid_params["stretching"]
 
 const (SIZE, TOPOLOGY) = size_and_topology((Nx, Ny, Nz))
 
 const z₀ = parse_units(grid_params["z₀"])
-
-# Z-GRID PROPERTIES (refinement of Δz at ice-ocean interface)
-const refinement = 1.2 # controls spacing near surface (higher means finer spaced)
-const stretching = 12  # controls rate of stretching at bottom
 
 z_faces = z_levels(Nz,Lz,z₀,refinement,stretching)
 
@@ -72,9 +72,17 @@ const cᴰ = (κᵣ / log(z_top / zᵣ))^2 # Drag coefficient
 u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(u_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)))
 v_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(v_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)))
 
+# Relaxation at bottom
+const τ = Lz/u₀
+println("τ=",τ)
+const width = Lz/4
+
+bottom_mask = GaussianMask{:z}(center=-Lz, width=width)
+u_sponge  = Relaxation(rate=1/τ, mask=bottom_mask, target=u₀)
+vw_sponge = Relaxation(rate=1/τ, mask=bottom_mask)
+
 buoyancy = Buoyancy(model = BuoyancyTracer())
 
-#closure = AnisotropicMinimumDissipation()
 closure = ScalarDiffusivity(ν=ν, κ=κ)
 
 model = NonhydrostaticModel(; grid, buoyancy,
@@ -82,8 +90,10 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             timestepper = :RungeKutta3,
                             tracers = (:b),
                             closure = closure,
-                            boundary_conditions = (;u=u_bcs, v=v_bcs))
+                            boundary_conditions = (;u=u_bcs, v=v_bcs),
+                            forcing=(u=u_sponge, v=vw_sponge, w=vw_sponge))
 println(model)
+println(model.forcing)
 
 # SIMULATION
 # define simulation with time stepper, and callbacks for some runtime info
@@ -116,7 +126,11 @@ u, v, w = model.velocities
 s = sqrt(u^2 + v^2 + w^2)
 ωy = ∂z(u) - ∂x(w)
 
-outputs = (; u, v, w, model.tracers.b, s, ωy)
+tke = Field(TurbulentKineticEnergy(model))
+shear_production_op = @at (Center, Center, Center) ∂z(u)^2 + ∂z(v)^2 + ∂z(w)^2
+sp = Field(shear_production_op)
+
+outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp)
 simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
