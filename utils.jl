@@ -16,6 +16,23 @@ function z_levels(Nz,Lz,z₀,refinement,stretching)
 end
 
 function parse_units(x)
-    val, unit = split(x)
-    return parse(Float64,val) * eval(Symbol(unit))
+    #val, unit = split(x)
+    #return parse(Float64,val) * eval(Symbol(unit))
+    return eval(Meta.parse(x))
 end
+
+function size_and_topology(dims)
+    (Nx, Ny, Nz) = dims
+    # determine grid size from dimensions -> (tuple)
+    SIZE = Tuple([x for x in dims if x > 1])
+    # determine grid topology from dimensions -> (tuple)
+    TOPOLOGY = (Nx > 1 ? Periodic : Flat, Ny > 1 ? Periodic : Flat, Bounded)
+    return (SIZE, TOPOLOGY)
+end
+
+function config2dict(config)
+    buf = IOBuffer()
+    TOML.print(buf, config)
+    return Dict("config" => String(take!(buf)))
+end
+

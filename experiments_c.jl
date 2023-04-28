@@ -25,9 +25,13 @@ experiment = config["experiment"]
 # GRID DIMENSIONS
 grid_params = config["grid"]
 const Nx = grid_params["Nx"]
+const Ny = grid_params["Ny"]
 const Nz = grid_params["Nz"]
 const Lx = parse_units(grid_params["Lx"])
+const Ly = parse_units(grid_params["Ly"])
 const Lz = parse_units(grid_params["Lz"])
+
+const (SIZE, TOPOLOGY) = size_and_topology((Nx, Ny, Nz))
 
 const z₀ = parse_units(grid_params["z₀"])
 
@@ -38,10 +42,11 @@ const stretching = 12  # controls rate of stretching at bottom
 z_faces = z_levels(Nz,Lz,z₀,refinement,stretching)
 
 grid = RectilinearGrid(ARCH;
-                       size = (Nx, Nz),
+                       size = SIZE,
                        x = (0, Lx),
+                       y = (0, Ly),
                        z = z_faces,
-                       topology=(Periodic, Flat, Bounded))
+                       topology=TOPOLOGY)
 println(grid)
 
 # MODEL
@@ -107,7 +112,12 @@ progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall t
 simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
 # OUTPUTS
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities, model.tracers), filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld))
+u, v, w = model.velocities
+s = sqrt(u^2 + v^2 + w^2)
+ωy = ∂z(u) - ∂x(w)
+
+outputs = (; u, v, w, model.tracers.b, s, ωy)
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
 

@@ -2,20 +2,22 @@ experiment = 'experiments_c'
 path       = ""
 
 ["simulation"]
-"stop_time"     = "50 hours"
-"Δt"            = "1 second"
-"max_Δt"        = "1 minute"
-"Δt_output_fld" = "5 minute"
+"stop_time"     = "50hours"
+"Δt"            = "1second"
+"max_Δt"        = "1minute"
+"Δt_output_fld" = "5minutes"
 
 ["grid"]
-# GRID DIMENSIONS
+# GRID DIMENSIONS (set to 1 if slice along this dim
 Nx = 25
+Ny = 1
 Nz = 50
 # GRID EXTENT
-Lx = "10 meters"
-Lz = "20 meters"
+Lx = "10meters"
+Ly = "0meters"
+Lz = "20meters"
 # depth of seawater parcel
-"z₀" = "0 meters"
+"z₀" = "0meters"
 
 ["far-field values"]
 "V∞" = 0.014    # far field velocity                 m s⁻¹
