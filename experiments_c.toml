@@ -25,12 +25,11 @@ refinement = 1.2
 stretching = 12
 
 ["far-field values"]
-"V∞" = 0.014    # far field velocity                 m s⁻¹
+"V∞" = 0.10     # far field velocity                 m s⁻¹
 "N²" = 1e-5     # far field buoyancy gradient        s⁻¹
 
 ["physical parameters"]
-"κ"  = 1.0e-4   # molecular diffusivity              m² s⁻¹
+"f₀" = -1.0e-4  # Coriolis parameter                 rad s⁻¹
+"κ"  = 1.0e-5   # molecular diffusivity              m² s⁻¹
 "ν"  = 1.0e-4   # molecular viscosity                m² s⁻¹
-"zᵣ" = 0.1      # roughness length                   m
-"κᵣ" = 0.4      # von Karman constant
-#"cᴰ" = 2.5e-3   # drag coefficient
+"cᴰ" = 3.0e-3   # drag coefficient

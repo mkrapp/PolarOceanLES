@@ -4,6 +4,8 @@ using Oceananigans
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilometers, meters
 using Oceananigans.TurbulenceClosures
+using Oceananigans.BoundaryConditions: getbc
+using Oceananigans: fields
 using Oceanostics
 using TOML
 include("utils.jl")
@@ -56,42 +58,32 @@ const u₀ = far_field["V∞"]
 const N² = far_field["N²"]
 # Parameters
 params = config["physical parameters"]
+const f₀ = params["f₀"]
 const κ  = params["κ"]
 const ν  = params["ν"]
-#const cᴰ = params["cᴰ"]
-const zᵣ = params["zᵣ"]
-const κᵣ = params["κᵣ"]
-
-const z_top = CUDA.@allowscalar abs(grid.zᵃᵃᶜ[grid.Nz])
-const cᴰ = (κᵣ / log(z_top / zᵣ))^2 # Drag coefficient
+const cᴰ = params["cᴰ"]
 
 # Boundary conditions: drag at the top (mimicking a solid ice interface)
 @inline u_quadratic_drag(x, y, t, u, v, p) = p.cᴰ * u * sqrt(u^2 + v^2)
 @inline v_quadratic_drag(x, y, t, u, v, p) = p.cᴰ * v * sqrt(u^2 + v^2)
 
-u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(u_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)))
-v_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(v_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)))
+u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(u_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
+v_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(v_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
 
-# Relaxation at bottom
-const τ = Lz/u₀
-println("τ=",τ)
-const width = Lz/4
-
-bottom_mask = GaussianMask{:z}(center=-Lz, width=width)
-u_sponge  = Relaxation(rate=1/τ, mask=bottom_mask, target=u₀)
-vw_sponge = Relaxation(rate=1/τ, mask=bottom_mask)
 
 buoyancy = Buoyancy(model = BuoyancyTracer())
 
 closure = ScalarDiffusivity(ν=ν, κ=κ)
 
+coriolis = FPlane(f=f₀)
+
 model = NonhydrostaticModel(; grid, buoyancy,
                             advection = UpwindBiasedFifthOrder(),
                             timestepper = :RungeKutta3,
+                            coriolis = coriolis,
                             tracers = (:b),
                             closure = closure,
-                            boundary_conditions = (;u=u_bcs, v=v_bcs),
-                            forcing=(u=u_sponge, v=vw_sponge, w=vw_sponge))
+                            boundary_conditions = (;u=u_bcs, v=v_bcs))
 println(model)
 println(model.forcing)
 
@@ -130,7 +122,30 @@ tke = Field(TurbulentKineticEnergy(model))
 shear_production_op = @at (Center, Center, Center) ∂z(u)^2 + ∂z(v)^2 + ∂z(w)^2
 sp = Field(shear_production_op)
 
-outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp)
+# Boundary condition extractor in "kernel function form"
+@inline kernel_getbc(i, j, k, grid, boundary_condition, clock, fields) =
+    getbc(boundary_condition, i, j, grid, clock, fields)
+
+# Kernel arguments
+grid = model.grid
+clock = model.clock
+model_fields = merge(fields(model), model.auxiliary_fields)
+u_bc = u.boundary_conditions.top
+v_bc = v.boundary_conditions.top
+
+# Build operations
+u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid; computed_dependencies=(u_bc, clock, model_fields))
+v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid; computed_dependencies=(v_bc, clock, model_fields))
+
+# Build Fields
+Qᵘ = Field(u_bc_op)
+Qᵛ = Field(v_bc_op)
+
+u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
+
+Ri = Field(Oceanostics.FlowDiagnostics.RichardsonNumber(model))
+
+outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp, u★, Ri)
 simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
