@@ -1,4 +1,4 @@
-experiment = 'experiments_d'
+experiment = '/home/krappma/vuw03548_nobackup/les/experiments_d'
 path       = ""
 
 ["simulation"]
@@ -9,13 +9,13 @@ path       = ""
 
 ["grid"]
 # GRID DIMENSIONS (set to 1 if slice along this dim
-Nx = 50
-Ny = 1
-Nz = 50
+Nx = 64
+Ny = 64
+Nz = 128
 # GRID EXTENT
-Lx = "50meters"
-Ly = "0meters"
-Lz = "25meters"
+Lx = "100meters"
+Ly = "100meters"
+Lz = "100meters"
 # depth of seawater parcel
 "z₀" = "0meters"
 # stretching of z-level
@@ -28,7 +28,8 @@ stretching = 12
 "V∞" = 0.10     # far field velocity                 m s⁻¹
 "T∞" = -1.9     # far field temperature              °C
 "S∞" = 35.0     # far field salinity                 g kg⁻¹
-
+"dTdz" = 9.5e-4 # temperature gradient               K m⁻¹
+"dSdz" = 4.0e-4 # salinity gradient                  g kg⁻¹ m⁻¹
 ["physical parameters"]
 "Lf" = 3.35e5   # latent heat of melting             J kg⁻¹
 "cₚ" = 3974.0   # heat capacity of water             J kg⁻¹ K⁻¹
@@ -36,8 +37,21 @@ stretching = 12
 "cᴰ" = 3.0e-3   # drag coefficient
 "κₜ" = 1.3e-7   # molecular diffusivity of heat      m² s⁻¹
 "κₛ" = 7.2e-10  # molecular diffusivity of salt      m² s⁻¹
+"κ" =  1.0e-6   # uniform molecular diffusivity      m² s⁻¹
 "ν"  = 1.8e-6   # molecular viscosity                m² s⁻¹
 "α"  = 3.87e-5  # thermal expansion coefficient      °C⁻¹
 "β"  = 7.86e-4  # haline expansion coefficient       kg g⁻¹
 "λ₁" = -5.73e-2 # freezing point coefficient 1       °C
 "λ₂" = 8.32e-2  # freezing point coefficient 2       °C
+"ρₒ" = 1026.0   # seawater density                      kg m⁻³
+"ρₐ" = 1.225    # air density at sea-level              kg m⁻³
+"ρf" = 920.0    # frazil density.                       kg m⁻³
+"de" = 1.0e-4   # frazil ice mean crystal thickness     m
+"df" = 1.0e-3   # frazil ice mean crystal face diameter m
+"Nu" = 4.0      # Nusselt number                        -
+"kw" = 0.56     # thermal conductivity of seawater      W m⁻¹ K⁻¹
+
+["forcing"]
+"Qʰ"  = 600.0   # surface heat flux                  W m⁻²
+"u₁₀" = 10.0    # wind speed at 10 meters            m s⁻¹
+"Qf"  = -1.0e-9 # frazil concentration flux          m s⁻¹

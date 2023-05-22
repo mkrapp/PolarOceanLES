@@ -57,12 +57,15 @@ far_field = config["far-field values"]
 const u₀ = far_field["V∞"]
 const T₀ = far_field["T∞"]
 const S₀ = far_field["S∞"]
-# Parameters
+const dTdz = far_field["dTdz"]
+const dSdz = far_field["dSdz"]
+# Physical parameters
 params = config["physical parameters"]
 const f₀ = params["f₀"]
 const cᴰ = params["cᴰ"]
 const κₜ = params["κₜ"]
 const κₛ = params["κₛ"]
+const κ = params["κ"]
 const ν  = params["ν"]
 const α  = params["α"]
 const β  = params["β"]
@@ -70,50 +73,70 @@ const λ₁ = params["λ₁"]
 const λ₂ = params["λ₂"]
 const Lf = params["Lf"]
 const cₚ = params["cₚ"]
+const ρₒ = params["ρₒ"]
+const ρₐ = params["ρₐ"]
+const ρf = params["ρf"]
+const de = params["de"]
+const df = params["df"]
+const Nu = params["Nu"]
+const kw = params["kw"]
+# Forcing
+forcing = config["forcing"]
+const Qʰ = forcing["Qʰ"]
+const u₁₀ = forcing["u₁₀"]
+const Qf = forcing["Qf"]
 
-# heat loss
-Qʰ = 200.0  # W m⁻², surface _heat_ flux
-ρₒ = 1026.0 # kg m⁻³, average density at the surface of the world ocean
 
-Qᵀ = Qʰ / (ρₒ * cₚ) # K m s⁻¹, surface _temperature_ flux
-
-# wind-stress
-u₁₀ = 10    # m s⁻¹, average wind velocity 10 meters above the ocean
-ρₐ = 1.225  # kg m⁻³, average density of air at sea-level
-
+# surface _temperature_ flux
+Qᵀ = Qʰ / (ρₒ * cₚ) # K m s⁻¹, 
+# surface _momentum_ flux (wind-stress)
 Qᵘ = - ρₐ / ρₒ * cᴰ * u₁₀ * abs(u₁₀) # m² s⁻²
-u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ))
+u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵘ), bottom = GradientBoundaryCondition(0.0))
+v_bcs = FieldBoundaryConditions(bottom = GradientBoundaryCondition(0.0))
 
-# bottom temperature gradient
-dTdz = 9.5e-4 # K m⁻¹
-
+# temperature boundary conditions: bottom temperature gradient
 T_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵀ),
                                 bottom = GradientBoundaryCondition(dTdz))
 
-## Boundary conditions: drag at the top (mimicking a solid ice interface)
-#@inline u_quadratic_drag(x, y, t, u, v, p) = p.cᴰ * u * sqrt(u^2 + v^2)
-#@inline v_quadratic_drag(x, y, t, u, v, p) = p.cᴰ * v * sqrt(u^2 + v^2)
-#
-#u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(u_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
-#v_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(v_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
+# salinity boundary conditions: bottom salinity gradient
+S_bcs = FieldBoundaryConditions(bottom = GradientBoundaryCondition(dSdz))
 
-
+# frazil concentration boundary conditons: surface frazil flux
+F_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qf))
 
 buoyancy = Buoyancy(model = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = α, haline_contraction = β)))
 
-closure = AnisotropicMinimumDissipation()#ScalarDiffusivity(ν=ν, κ=(S=κₛ, T=κₜ, F=0.0))
+closure = AnisotropicMinimumDissipation()
+# closure = ScalarDiffusivity(ν=ν, κ=κ)
 
 coriolis = FPlane(f=f₀)
 
 # frazil dynamics
 # liquidus condition for seawater temperature
 @inline Tf(x, y, z, t, S, params) = params.λ₁*S + params.λ₂
-@inline create_and_remove(x, y, z, t, F, T, S, params) = params.p₁ * F
+# Eq(9) in Omstedt (1984); heat transfer
+@inline q(x, y, z, t, T, S, params) = params.Nu * params.kw / params.de * (Tf(x, y, z, t, S, params) - T)
+# Eq(11) in Omstedt (1984); heat transfer
+@inline GT(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) / (params.df * params.ρₒ * params.cₚ) 
+# Eq(12) in Omstedt (1984); frazil formation
+@inline GF(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) / (params.df * params.ρf * params.Lf) 
+# Eq(13) in Omstedt (1984); salt rejection
+@inline GS(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) * S / (params.df * params.ρₒ * params.Lf) 
 
-frazil_dynamics_parameters = (p₁ = 1.0,)
+frazil_parameters = (λ₁ = λ₁, λ₂ = λ₂, Nu = Nu, kw = kw, de = de, df = df, ρₒ = ρₒ, cₚ = cₚ, Lf = Lf, ρf = ρf,)
 
-frazil_dynamics = Forcing(create_and_remove, field_dependencies = (:F, :T, :S),
-                            parameters = frazil_dynamics_parameters)
+frazil_dynamics_T = Forcing(GT, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
+frazil_dynamics_F = Forcing(GF, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
+frazil_dynamics_S = Forcing(GS, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
+
+V_d = π*(df/2)^2*de       # disc volume
+deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
+#println(deq)
+Δb = g_Earth * (ρₒ - ρf) / ρₒ   # m s⁻²
+w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
+#println(w_frazil)
+
+rising = AdvectiveForcing(UpwindBiasedFifthOrder(), w=w_frazil)
 
 model = NonhydrostaticModel(; grid, buoyancy,
                             advection = UpwindBiasedFifthOrder(),
@@ -121,8 +144,8 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             coriolis = coriolis,
                             tracers = (:T,:S,:F),
                             closure = closure,
-                            forcing = (; F=frazil_dynamics),
-                            boundary_conditions = (;u=u_bcs, T=T_bcs))
+                            forcing = (; T=frazil_dynamics_T, S=frazil_dynamics_S, F=(frazil_dynamics_F, rising)),
+                            boundary_conditions = (;u=u_bcs, v=v_bcs, T=T_bcs, S=S_bcs, F=F_bcs))
 println(model)
 
 # SIMULATION
@@ -133,16 +156,16 @@ println(model)
 # INITIAL CONDITIONS
 @inline Tᵢ(x, y, z) = T₀ - dTdz * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
 # Salinity initial condition: a stable gradient with random noise superposed.
-@inline Sᵢ(x, y, z) = S₀ - 4e-4 * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+@inline Sᵢ(x, y, z) = S₀ - dSdz * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
 # Velocity initial condition: random noise scaled by the friction velocity.
 @inline vᵢ(x, y, z) = sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z)
 # `set!` the `model` fields using functions or constants:
-set!(model, u=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ)
+set!(model, u=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ, F=0.0)
 
 # define simulation with time stepper, and callbacks for some runtime info
 simulation = Simulation(model, Δt =  Δt, stop_time=stop_time)
 wizard = TimeStepWizard(cfl=0.5, max_change=1.1, max_Δt=max_Δt)
-simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
+simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(100))
 
 # Print a progress message
 progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall time: %s, max(|w|) = %.1e ms⁻¹\n\t T = [%.3g, %.3g], S = [%.3g, %.3g], F = [%.3g, %.3g]\n",
@@ -152,7 +175,7 @@ progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall t
                                 minimum(sim.model.tracers.S), maximum(sim.model.tracers.S),
                                 minimum(sim.model.tracers.F), maximum(sim.model.tracers.F))
 
-simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
+simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(100))
 
 # OUTPUTS
 u, v, w = model.velocities
