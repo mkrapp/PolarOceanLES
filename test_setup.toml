@@ -1,10 +1,10 @@
-experiment = 'experiments_0'
+experiment = 'test_setup'
 path       = ""
 
 ["simulation"]
-"stop_time"        = "100 seconds"
-"Δt"               = "1 second"
-"max_Δt"           = "10 minutes"
+"stop_time"        = "100seconds"
+"Δt"               = "1second"
+"max_Δt"           = "10minutes"
 
 ["grid"]
 # GRID DIMENSIONS
@@ -12,6 +12,6 @@ Nx = 1
 Ny = 1
 Nz = 1
 # GRID EXTENT
-Lx = "1 meter"
-Ly = "1 meter"
-Lz = "1 meter"
+Lx = "1meter"
+Ly = "1meter"
+Lz = "1meter"

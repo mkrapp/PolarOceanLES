@@ -24,7 +24,7 @@ julia test_setup.jl test_setup.toml
 
 Output:
 ```
- ▷ Experiment: 'experiments_0' ◁ 
+ ▷ Experiment: 'test_setup' ◁
 1×1×1 RectilinearGrid{Float64, Periodic, Periodic, Bounded} on GPU with 3×3×3 halo
 ├── Periodic x ∈ [0.0, 1.0) regularly spaced with Δx=1.0
 ├── Periodic y ∈ [0.0, 1.0) regularly spaced with Δy=1.0
