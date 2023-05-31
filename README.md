@@ -51,7 +51,7 @@ NonhydrostaticModel{GPU, RectilinearGrid}(time = 0 seconds, iteration = 0)
 
 ## Experiments A
 
-A basic experiment where we simulate the cooling of a surface of a 10mx10mx10m ocean box for 5 hours. It is initialized with a far-field velocity of 1.4 cm/s, a far-field temperature of -1.9°C (and $\partial T/\partial z$ = 9.5e-4 °C/m) and a salinity of 34.5 g/kg (and $\partial S/\partial z$ = 4.e-4 g/kg/m).
+A basic experiment where we simulate the cooling of a surface of a 10mx10mx10m ocean box for 5 hours. It is initialized with a far-field velocity of 10.0 cm/s, a far-field temperature of -1.9°C (and $\partial T/\partial z$ = 9.5e-4 °C/m) and a salinity of 34.5 g/kg (and $\partial S/\partial z$ = 4.e-4 g/kg/m).
 
 ```bash
 julia experiments_a.jl experiments_a.toml
@@ -59,7 +59,7 @@ julia experiments_a.jl experiments_a.toml
 
 ## Experiments B
 
-A basic experiment similar to A but instead of surface cooling we apply a surface drag, mimicking a solid ice interface (such as sea ice cover or an ice shelf) at the top of the 10mx10mx10m ocean box. At the bottom the velocity fields are relaxed towards their far-field values (i.e., a "sponge layer"). The simulation length is 2 days.
+A basic experiment similar to A but instead of surface cooling we apply a surface drag, mimicking a solid ice interface (such as sea ice cover or an ice shelf) at the top of the 10mx10mx10m ocean box.
 
 ```bash
 julia experiments_b.jl experiments_b.toml
