@@ -70,7 +70,6 @@ const cᴰ = params["cᴰ"]
 u_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(u_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
 v_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(v_quadratic_drag, field_dependencies=(:u, :v), parameters=(;cᴰ=cᴰ)), bottom = GradientBoundaryCondition(0.0))
 
-
 buoyancy = Buoyancy(model = BuoyancyTracer())
 
 closure = ScalarDiffusivity(ν=ν, κ=κ)
@@ -85,7 +84,6 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             closure = closure,
                             boundary_conditions = (;u=u_bcs, v=v_bcs))
 println(model)
-println(model.forcing)
 
 # SIMULATION
 # define simulation with time stepper, and callbacks for some runtime info
@@ -134,8 +132,8 @@ u_bc = u.boundary_conditions.top
 v_bc = v.boundary_conditions.top
 
 # Build operations
-u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid; computed_dependencies=(u_bc, clock, model_fields))
-v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid; computed_dependencies=(v_bc, clock, model_fields))
+u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
+v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
 
 # Build Fields
 Qᵘ = Field(u_bc_op)
@@ -143,9 +141,7 @@ Qᵛ = Field(v_bc_op)
 
 u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
 
-Ri = Field(Oceanostics.FlowDiagnostics.RichardsonNumber(model))
-
-outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp, u★, Ri)
+outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp, u★)
 simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)

@@ -1,0 +1,34 @@
+experiment = 'experiments_b'
+path       = ""
+
+["simulation"]
+"stop_time"        = "5hours"
+"Δt"               = "1second"
+"max_Δt"           = "1minute"
+"Δt_output_fld"    = "20seconds"
+
+["grid"]
+# GRID DIMENSIONS
+Nx = 32
+Ny = 32
+Nz = 64
+# GRID EXTENT
+Lx = "10meters"
+Ly = "10meters"
+Lz = "10meters"
+# depth of seawater parcel
+"z₀" = "0meters"
+
+["far-field values"]
+"V∞" = 0.10     # far field velocity                 m s⁻¹
+"T∞" = -1.9     # far field temperature              °C
+"S∞" = 34.5     # far field salinity                 g kg⁻¹
+
+["physical parameters"]
+"κₜ" = 1.4e-7   # molecular diffusivity of heat      m² s⁻¹
+"κₛ" = 1.3e-9   # molecular diffusivity of salt      m² s⁻¹
+"ν"  = 2.0e-6   # molecular viscosity                m² s⁻¹
+"α"  = 3.8e-5   # thermal expansion coefficient      °C⁻¹
+"β"  = 7.8e-4   # haline expansion coefficient       kg g⁻¹
+"f₀" = -1.37e-4 # Coriolis parameter (for 70°S)      rad s⁻¹
+"cᴰ" = 2.5e-3   # drag coefficient
