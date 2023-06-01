@@ -10,7 +10,12 @@ using Oceanostics
 using TOML
 include("utils.jl")
 
-config = TOML.parsefile(ARGS[1])
+if length(ARGS) == 0
+    println("Enter name of configuration file:")
+    config = TOML.parsefile(readline())
+else
+    config = TOML.parsefile(ARGS[1])
+end
 
 # model runtime parameters: number of hours, grid size, filename, etc
 sim_params = config["simulation"]
@@ -65,17 +70,18 @@ const f₀ = params["f₀"]
 const cᴰ = params["cᴰ"]
 const κₜ = params["κₜ"]
 const κₛ = params["κₛ"]
-const κ = params["κ"]
+const κ  = params["κ"]
 const ν  = params["ν"]
 const α  = params["α"]
 const β  = params["β"]
 const λ₁ = params["λ₁"]
 const λ₂ = params["λ₂"]
+const λ₃ = params["λ₃"]
 const Lf = params["Lf"]
 const cₚ = params["cₚ"]
 const ρₒ = params["ρₒ"]
 const ρₐ = params["ρₐ"]
-const ρf = params["ρf"]
+const ρᵢ = params["ρᵢ"]
 const de = params["de"]
 const df = params["df"]
 const Nu = params["Nu"]
@@ -113,17 +119,17 @@ coriolis = FPlane(f=f₀)
 
 # frazil dynamics
 # liquidus condition for seawater temperature
-@inline Tf(x, y, z, t, S, params) = params.λ₁*S + params.λ₂
+@inline Tf(x, y, z, t, S, params) = params.λ₁*S + params.λ₂ + params.λ₃*z
 # Eq(9) in Omstedt (1984); heat transfer
 @inline q(x, y, z, t, T, S, params) = params.Nu * params.kw / params.de * (Tf(x, y, z, t, S, params) - T)
 # Eq(11) in Omstedt (1984); heat transfer
-@inline GT(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) / (params.df * params.ρₒ * params.cₚ) 
+@inline GT(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρₒ * params.cₚ)
 # Eq(12) in Omstedt (1984); frazil formation
-@inline GF(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) / (params.df * params.ρf * params.Lf) 
+@inline GF(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρᵢ * params.Lf)
 # Eq(13) in Omstedt (1984); salt rejection
-@inline GS(x, y, z, t, F, T, S, params) = 4 * max.(0,F) * q(x, y, z, t, T, S, params) * S / (params.df * params.ρₒ * params.Lf) 
+@inline GS(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) * S / (params.df * params.ρₒ * params.Lf)
 
-frazil_parameters = (λ₁ = λ₁, λ₂ = λ₂, Nu = Nu, kw = kw, de = de, df = df, ρₒ = ρₒ, cₚ = cₚ, Lf = Lf, ρf = ρf,)
+frazil_parameters = (λ₁ = λ₁, λ₂ = λ₂, λ₃ = λ₃, Nu = Nu, kw = kw, de = de, df = df, ρₒ = ρₒ, cₚ = cₚ, Lf = Lf, ρᵢ = ρᵢ,)
 
 frazil_dynamics_T = Forcing(GT, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 frazil_dynamics_F = Forcing(GF, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
@@ -132,7 +138,7 @@ frazil_dynamics_S = Forcing(GS, field_dependencies = (:F, :T, :S), parameters = 
 V_d = π*(df/2)^2*de       # disc volume
 deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
 #println(deq)
-Δb = g_Earth * (ρₒ - ρf) / ρₒ   # m s⁻²
+Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
 w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
 #println(w_frazil)
 
@@ -198,8 +204,8 @@ u_bc = u.boundary_conditions.top
 v_bc = v.boundary_conditions.top
 
 # Build operations
-u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid; computed_dependencies=(u_bc, clock, model_fields))
-v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid; computed_dependencies=(v_bc, clock, model_fields))
+u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
+v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
 
 # Build Fields
 Qᵘ = Field(u_bc_op)

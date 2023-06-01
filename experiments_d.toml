@@ -1,4 +1,4 @@
-experiment = '/home/krappma/vuw03548_nobackup/les/experiments_d'
+experiment = 'experiments_d'
 path       = ""
 
 ["simulation"]
@@ -43,9 +43,10 @@ stretching = 12
 "β"  = 7.86e-4  # haline expansion coefficient       kg g⁻¹
 "λ₁" = -5.73e-2 # freezing point coefficient 1       °C
 "λ₂" = 8.32e-2  # freezing point coefficient 2       °C
+"λ₃" = 7.6e-4   # freezing point coefficient 2       °C m⁻¹
 "ρₒ" = 1026.0   # seawater density                      kg m⁻³
 "ρₐ" = 1.225    # air density at sea-level              kg m⁻³
-"ρf" = 920.0    # frazil density.                       kg m⁻³
+"ρᵢ" = 920.0    # frazil density.                       kg m⁻³
 "de" = 1.0e-4   # frazil ice mean crystal thickness     m
 "df" = 1.0e-3   # frazil ice mean crystal face diameter m
 "Nu" = 4.0      # Nusselt number                        -
