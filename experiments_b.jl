@@ -116,7 +116,7 @@ progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall t
 simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
 # OUTPUTS
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities, model.tracers), filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld))
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, merge(model.velocities, model.tracers), filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld))
 
 run!(simulation)
 

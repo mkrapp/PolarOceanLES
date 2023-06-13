@@ -6,11 +6,16 @@ using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilo
 using Oceananigans.TurbulenceClosures
 using Oceananigans.BoundaryConditions: getbc
 using Oceananigans: fields
-using Oceanostics
+#using Oceanostics
 using TOML
 include("utils.jl")
 
-config = TOML.parsefile(ARGS[1])
+if length(ARGS) == 0
+    println("Enter name of configuration file:")
+    config = TOML.parsefile(readline())
+else
+    config = TOML.parsefile(ARGS[1])
+end
 
 # model runtime parameters: number of hours, grid size, filename, etc
 sim_params = config["simulation"]
@@ -116,33 +121,33 @@ u, v, w = model.velocities
 s = sqrt(u^2 + v^2 + w^2)
 ωy = ∂z(u) - ∂x(w)
 
-tke = Field(TurbulentKineticEnergy(model))
+#tke = Field(TurbulentKineticEnergy(model))
 shear_production_op = @at (Center, Center, Center) ∂z(u)^2 + ∂z(v)^2 + ∂z(w)^2
 sp = Field(shear_production_op)
 
-# Boundary condition extractor in "kernel function form"
-@inline kernel_getbc(i, j, k, grid, boundary_condition, clock, fields) =
-    getbc(boundary_condition, i, j, grid, clock, fields)
+## Boundary condition extractor in "kernel function form"
+#@inline kernel_getbc(i, j, k, grid, boundary_condition, clock, fields) =
+#    getbc(boundary_condition, i, j, grid, clock, fields)
+#
+## Kernel arguments
+#grid = model.grid
+#clock = model.clock
+#model_fields = merge(fields(model), model.auxiliary_fields)
+#u_bc = u.boundary_conditions.top
+#v_bc = v.boundary_conditions.top
+#
+## Build operations
+#u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
+#v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
+#
+## Build Fields
+#Qᵘ = Field(u_bc_op)
+#Qᵛ = Field(v_bc_op)
+#
+#u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
 
-# Kernel arguments
-grid = model.grid
-clock = model.clock
-model_fields = merge(fields(model), model.auxiliary_fields)
-u_bc = u.boundary_conditions.top
-v_bc = v.boundary_conditions.top
-
-# Build operations
-u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
-v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
-
-# Build Fields
-Qᵘ = Field(u_bc_op)
-Qᵛ = Field(v_bc_op)
-
-u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
-
-outputs = (; u, v, w, model.tracers.b, s, ωy, tke, sp, u★)
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
+outputs = (; u, v, w, model.tracers.b, s, ωy, sp)
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
 
