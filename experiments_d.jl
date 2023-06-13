@@ -216,7 +216,7 @@ sp = Field(shear_production_op)
 T, S, F = model.tracers
 
 outputs = (; u, v, w, T, S, F, s, ωy, sp, tke)
-simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
+simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
 
