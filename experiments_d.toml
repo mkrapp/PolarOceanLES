@@ -9,13 +9,13 @@ path       = ""
 
 ["grid"]
 # GRID DIMENSIONS (set to 1 if slice along this dim
-Nx = 64
-Ny = 64
-Nz = 128
+Nx = 16
+Ny = 16
+Nz = 32
 # GRID EXTENT
-Lx = "100meters"
-Ly = "100meters"
-Lz = "100meters"
+Lx = "50meters"
+Ly = "50meters"
+Lz = "50meters"
 # depth of seawater parcel
 "z₀" = "0meters"
 # stretching of z-level

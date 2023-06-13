@@ -4,8 +4,8 @@ using Oceananigans
 using Oceananigans.BuoyancyModels: g_Earth
 using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilometers, meters
 using Oceananigans.TurbulenceClosures
-using Oceananigans.BoundaryConditions: getbc
-using Oceananigans: fields
+#using Oceananigans.BoundaryConditions: getbc
+#using Oceananigans: fields
 using Oceanostics
 using TOML
 include("utils.jl")
@@ -135,14 +135,14 @@ frazil_dynamics_T = Forcing(GT, field_dependencies = (:F, :T, :S), parameters = 
 frazil_dynamics_F = Forcing(GF, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 frazil_dynamics_S = Forcing(GS, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 
-V_d = π*(df/2)^2*de       # disc volume
-deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
-#println(deq)
-Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
-w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
-#println(w_frazil)
-
-rising = AdvectiveForcing(UpwindBiasedFifthOrder(), w=w_frazil)
+#V_d = π*(df/2)^2*de       # disc volume
+#deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
+##println(deq)
+#Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
+#w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
+##println(w_frazil)
+#
+#rising = AdvectiveForcing(UpwindBiasedFifthOrder(), w=w_frazil)
 
 model = NonhydrostaticModel(; grid, buoyancy,
                             advection = UpwindBiasedFifthOrder(),
@@ -150,7 +150,7 @@ model = NonhydrostaticModel(; grid, buoyancy,
                             coriolis = coriolis,
                             tracers = (:T,:S,:F),
                             closure = closure,
-                            forcing = (; T=frazil_dynamics_T, S=frazil_dynamics_S, F=(frazil_dynamics_F, rising)),
+                            forcing = (; T=frazil_dynamics_T, S=frazil_dynamics_S, F=frazil_dynamics_F),
                             boundary_conditions = (;u=u_bcs, v=v_bcs, T=T_bcs, S=S_bcs, F=F_bcs))
 println(model)
 
@@ -166,12 +166,12 @@ println(model)
 # Velocity initial condition: random noise scaled by the friction velocity.
 @inline vᵢ(x, y, z) = sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z)
 # `set!` the `model` fields using functions or constants:
-set!(model, u=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ, F=0.0)
+set!(model, v=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ, F=0.0)
 
 # define simulation with time stepper, and callbacks for some runtime info
-simulation = Simulation(model, Δt =  Δt, stop_time=stop_time)
+simulation = Simulation(model, Δt = Δt, stop_time=stop_time)
 wizard = TimeStepWizard(cfl=0.5, max_change=1.1, max_Δt=max_Δt)
-simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(100))
+simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 
 # Print a progress message
 progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall time: %s, max(|w|) = %.1e ms⁻¹\n\t T = [%.3g, %.3g], S = [%.3g, %.3g], F = [%.3g, %.3g]\n",
@@ -181,7 +181,7 @@ progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall t
                                 minimum(sim.model.tracers.S), maximum(sim.model.tracers.S),
                                 minimum(sim.model.tracers.F), maximum(sim.model.tracers.F))
 
-simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(100))
+simulation.callbacks[:progress] = Callback(progress_message, IterationInterval(20))
 
 # OUTPUTS
 u, v, w = model.velocities
@@ -192,30 +192,30 @@ tke = Field(TurbulentKineticEnergy(model))
 shear_production_op = @at (Center, Center, Center) ∂z(u)^2 + ∂z(v)^2 + ∂z(w)^2
 sp = Field(shear_production_op)
 
-# Boundary condition extractor in "kernel function form"
-@inline kernel_getbc(i, j, k, grid, boundary_condition, clock, fields) =
-    getbc(boundary_condition, i, j, grid, clock, fields)
-
-# Kernel arguments
-grid = model.grid
-clock = model.clock
-model_fields = merge(fields(model), model.auxiliary_fields)
-u_bc = u.boundary_conditions.top
-v_bc = v.boundary_conditions.top
-
-# Build operations
-u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
-v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
-
-# Build Fields
-Qᵘ = Field(u_bc_op)
-Qᵛ = Field(v_bc_op)
-
-u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
+## Boundary condition extractor in "kernel function form"
+#@inline kernel_getbc(i, j, k, grid, boundary_condition, clock, fields) =
+#    getbc(boundary_condition, i, j, grid, clock, fields)
+#
+## Kernel arguments
+#grid = model.grid
+#clock = model.clock
+#model_fields = merge(fields(model), model.auxiliary_fields)
+#u_bc = u.boundary_conditions.top
+#v_bc = v.boundary_conditions.top
+#
+## Build operations
+##u_bc_op=KernelFunctionOperation{Face, Center, Nothing}(kernel_getbc, grid, u_bc, clock, model_fields)
+#v_bc_op=KernelFunctionOperation{Center, Face, Nothing}(kernel_getbc, grid, v_bc, clock, model_fields)
+#
+## Build Fields
+#Qᵘ = Field(u_bc_op)
+#Qᵛ = Field(v_bc_op)
+#
+#u★ = sqrt(sqrt(Qᵘ^2 + Qᵛ^2))
 
 T, S, F = model.tracers
 
-outputs = (; u, v, w, T, S, F, s, ωy, tke, sp, u★)
+outputs = (; u, v, w, T, S, F, s, ωy, sp, tke)
 simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
