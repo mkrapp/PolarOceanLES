@@ -6,16 +6,17 @@ using Oceananigans.Units: seconds, minute, minutes, hour, hours, kilometer, kilo
 using Oceananigans.TurbulenceClosures
 #using Oceananigans.BoundaryConditions: getbc
 #using Oceananigans: fields
-using Oceanostics
+#using Oceanostics
 using TOML
 include("utils.jl")
 
 if length(ARGS) == 0
     println("Enter name of configuration file:")
-    config = TOML.parsefile(readline())
+   config = TOML.parsefile(readline())
 else
-    config = TOML.parsefile(ARGS[1])
+   config = TOML.parsefile(ARGS[1])
 end
+# config = TOML.parsefile("experiments_d.toml")
 
 # model runtime parameters: number of hours, grid size, filename, etc
 sim_params = config["simulation"]
@@ -62,8 +63,10 @@ far_field = config["far-field values"]
 const u₀ = far_field["V∞"]
 const T₀ = far_field["T∞"]
 const S₀ = far_field["S∞"]
+const F₀ = far_field["F₀"]
 const dTdz = far_field["dTdz"]
 const dSdz = far_field["dSdz"]
+const Tₜ = far_field["Tₜ"]
 # Physical parameters
 params = config["physical parameters"]
 const f₀ = params["f₀"]
@@ -108,49 +111,73 @@ T_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qᵀ),
 S_bcs = FieldBoundaryConditions(bottom = GradientBoundaryCondition(dSdz))
 
 # frazil concentration boundary conditons: surface frazil flux
-F_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qf))
+F_bcs = FieldBoundaryConditions(top = FluxBoundaryCondition(Qf), bottom = ValueBoundaryCondition(0.0))
 
 buoyancy = Buoyancy(model = SeawaterBuoyancy(equation_of_state=LinearEquationOfState(thermal_expansion = α, haline_contraction = β)))
 
-closure = AnisotropicMinimumDissipation()
-# closure = ScalarDiffusivity(ν=ν, κ=κ)
+# closure = AnisotropicMinimumDissipation()
+closure = ScalarDiffusivity(ν=ν, κ=κ)
 
-coriolis = FPlane(f=f₀)
+#coriolis = FPlane(f=f₀)
+coriolis = nothing
 
 # frazil dynamics
 # liquidus condition for seawater temperature
 @inline Tf(x, y, z, t, S, params) = params.λ₁*S + params.λ₂ + params.λ₃*z
-# Eq(9) in Omstedt (1984); heat transfer
-@inline q(x, y, z, t, T, S, params) = params.Nu * params.kw / params.de * (Tf(x, y, z, t, S, params) - T)
-# Eq(11) in Omstedt (1984); heat transfer
-@inline GT(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρₒ * params.cₚ)
-# Eq(12) in Omstedt (1984); frazil formation
-@inline GF(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρᵢ * params.Lf)
-# Eq(13) in Omstedt (1984); salt rejection
-@inline GS(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) * S / (params.df * params.ρₒ * params.Lf)
+# # Eq(9) in Omstedt (1984); heat transfer
+# @inline q(x, y, z, t, T, S, params) = params.Nu * params.kw / params.de * (max.(Tf(x, y, z, t, S, params) - T))
+# # Eq(11) in Omstedt (1984); heat transfer
+# @inline GT(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρₒ * params.cₚ)
+# # Eq(12) in Omstedt (1984); frazil formation
+# @inline GF(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) / (params.df * params.ρᵢ * params.Lf)
+# # Eq(13) in Omstedt (1984); salt rejection
+# @inline GS(x, y, z, t, F, T, S, params) = 4 * F * q(x, y, z, t, T, S, params) * S / (params.df * params.ρₒ * params.Lf)
 
-frazil_parameters = (λ₁ = λ₁, λ₂ = λ₂, λ₃ = λ₃, Nu = Nu, kw = kw, de = de, df = df, ρₒ = ρₒ, cₚ = cₚ, Lf = Lf, ρᵢ = ρᵢ,)
+# V_d = π*(df/2)^2*de       # disc volume
+# deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
+# #println(deq)
+# Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
+# w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
+# #println(w_frazil)
+
+# const ar = de/df
+# const r = df
+const γₜ  = Nu*κₜ/de
+const γₛ = Nu*κₛ/de
+println(γₜ)
+println(γₛ)
+
+# @inline wc(x, y, z, t, F, T, S, p) = p.cₚ/p.Lf * (1 - F) * p.γₜ * (T - Tf(x, y, z, t, S, p)) * 2*F/p.r
+# this is the solution of the three equation system (12), (13), and (15) in "On the Conditional Frazil Ice
+# Instability in Seawater", https://journals.ametsoc.org/view/journals/phoc/45/4/jpo-d-14-0159.1.xml
+@inline wc(x,y,z,t,F,T,S,p) = F*(F - 1)*(-T*p.cₚ*p.γₜ + p.Lf*p.γₛ + p.cₚ*p.γₜ*p.λ₂ + p.cₚ*p.γₜ*p.λ₃*z)/(p.Lf*p.df) - F*(F - 1)*sqrt(-4*S*p.Lf*p.cₚ*p.γₛ*p.γₜ*p.λ₁ + T^2*p.cₚ^2*p.γₜ^2 + 2*T*p.Lf*p.cₚ*p.γₛ*p.γₜ - 2*T*p.cₚ^2*p.γₜ^2*p.λ₂ - 2*T*p.cₚ^2*p.γₜ^2*p.λ₃*z + p.Lf^2*p.γₛ^2 - 2*p.Lf*p.cₚ*p.γₛ*p.γₜ*p.λ₂ - 2*p.Lf*p.cₚ*p.γₛ*p.γₜ*p.λ₃*z + p.cₚ^2*p.γₜ^2*p.λ₂^2 + 2*p.cₚ^2*p.γₜ^2*p.λ₂*p.λ₃*z + p.cₚ^2*p.γₜ^2*p.λ₃^2*z^2)/(p.Lf*p.df)
+@inline GT(x, y, z, t, F, T, S, params) = (Tf(x, y, z, t, S, params) - T - params.Lf/params.cₚ) * wc(x, y, z, t, F, T, S, params)
+@inline GS(x, y, z, t, F, T, S, params) = - S * wc(x, y, z, t, F, T, S, params)
+@inline GF(x, y, z, t, F, T, S, params) = - wc(x, y, z, t, F, T, S, params)
+
+
+frazil_parameters = (λ₁ = λ₁, λ₂ = λ₂, λ₃ = λ₃, Nu = Nu, kw = kw, de = de, df = df, ρₒ = ρₒ, cₚ = cₚ, Lf = Lf, ρᵢ = ρᵢ, γₜ=γₜ, γₛ=γₛ, )
 
 frazil_dynamics_T = Forcing(GT, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 frazil_dynamics_F = Forcing(GF, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 frazil_dynamics_S = Forcing(GS, field_dependencies = (:F, :T, :S), parameters = frazil_parameters)
 
-#V_d = π*(df/2)^2*de       # disc volume
-#deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
-##println(deq)
-#Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
-#w_frazil = 2/9 * Δb / ν * deq^2 # m s⁻¹
-##println(w_frazil)
-#
-#rising = AdvectiveForcing(UpwindBiasedFifthOrder(), w=w_frazil)
+V_d = 3/4π*df*(de)^2    # ellipsoid volume
+deq = 2*(3/4*V_d/π)^(1/3) # equivalent sphere diameter
+#println(deq)
+Δb = g_Earth * (ρₒ - ρᵢ) / ρₒ   # m s⁻²
+const w_frazil = 0.01 #2/9 * Δb / ν * deq^2 # m s⁻¹
+println(w_frazil)
+rising = AdvectiveForcing(; w=w_frazil)
 
 model = NonhydrostaticModel(; grid, buoyancy,
-                            advection = UpwindBiasedFifthOrder(),
+                            advection = WENO(),
                             timestepper = :RungeKutta3,
                             coriolis = coriolis,
                             tracers = (:T,:S,:F),
                             closure = closure,
-                            forcing = (; T=frazil_dynamics_T, S=frazil_dynamics_S, F=frazil_dynamics_F),
+                            # forcing = (; F=(frazil_dynamics_F, rising)),
+                            forcing = (; T=frazil_dynamics_T, S=frazil_dynamics_S, F=(frazil_dynamics_F, rising)),
                             boundary_conditions = (;u=u_bcs, v=v_bcs, T=T_bcs, S=S_bcs, F=F_bcs))
 println(model)
 
@@ -160,13 +187,18 @@ println(model)
 @inline Ξ(z) = randn() * (z - z₀) / model.grid.Lz * (1 + (z - z₀) / model.grid.Lz) # noise
 
 # INITIAL CONDITIONS
-@inline Tᵢ(x, y, z) = T₀ - dTdz * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+# @inline Tᵢ(x, y, z) = T₀ + dTdz * (z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
 # Salinity initial condition: a stable gradient with random noise superposed.
-@inline Sᵢ(x, y, z) = S₀ - dSdz * (model.grid.Lz + z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+@inline Sᵢ(x, y, z) = S₀ + dSdz * (z - z₀) + model.grid.Lz * 1e-6 * Ξ(z)
+@inline Tᵢ(x, y, z) = Tf(x, y, z, 0, Sᵢ(x, y, z), frazil_parameters) + (z > bottom_z + 20meters ? Tₜ : 0.0)
 # Velocity initial condition: random noise scaled by the friction velocity.
-@inline vᵢ(x, y, z) = sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z)
+@inline vᵢ(x, y, z) = sqrt(abs(Qᵘ)) > 0 ? sqrt(abs(Qᵘ)) * 1e-3 * Ξ(z) : 1e-5 * Ξ(z)
+const bottom_z = @CUDA.allowscalar grid.zᵃᵃᶜ[1]
+# Initital frazil at the bottom
+# @inline Fᵢ(x, y, z) = z == bottom_z ? F₀ : 0.0
+@inline Fᵢ(x, y, z) = z < bottom_z + 20meters ? F₀ : 0.0
 # `set!` the `model` fields using functions or constants:
-set!(model, v=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ, F=0.0)
+set!(model, u=u₀, v=vᵢ, w=vᵢ, T=Tᵢ, S=Sᵢ, F=Fᵢ)
 
 # define simulation with time stepper, and callbacks for some runtime info
 simulation = Simulation(model, Δt = Δt, stop_time=stop_time)
@@ -174,7 +206,7 @@ wizard = TimeStepWizard(cfl=0.5, max_change=1.1, max_Δt=max_Δt)
 simulation.callbacks[:wizard] = Callback(wizard, IterationInterval(10))
 
 # Print a progress message
-progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall time: %s, max(|w|) = %.1e ms⁻¹\n\t T = [%.3g, %.3g], S = [%.3g, %.3g], F = [%.3g, %.3g]\n",
+progress_message(sim) = @printf(" ▷ Iteration: %06d, time: %s, Δt: %s, wall time: %s, max(|w|) = %.1e ms⁻¹\n\t T = [%4.2f, %4.2f], S = [%5.3f, %5.3f], F = [%5.4f, %5.4f]\n",
                                 iteration(sim), prettytime(sim), prettytime(sim.Δt),prettytime(sim.run_wall_time),
                                 maximum(abs, sim.model.velocities.w),
                                 minimum(sim.model.tracers.T), maximum(sim.model.tracers.T),
@@ -188,7 +220,7 @@ u, v, w = model.velocities
 s = sqrt(u^2 + v^2 + w^2)
 ωy = ∂z(u) - ∂x(w)
 
-tke = Field(TurbulentKineticEnergy(model))
+#tke = Field(TurbulentKineticEnergy(model))
 shear_production_op = @at (Center, Center, Center) ∂z(u)^2 + ∂z(v)^2 + ∂z(w)^2
 sp = Field(shear_production_op)
 
@@ -215,7 +247,8 @@ sp = Field(shear_production_op)
 
 T, S, F = model.tracers
 
-outputs = (; u, v, w, T, S, F, s, ωy, sp, tke)
+# outputs = (; u, v, w, T, S, F, s, ωy, sp, tke)
+outputs = (; u, w, T, S, F)
 simulation.output_writers[:field_writer] = NetCDFOutputWriter(model, outputs, filename = path * experiment * ".nc", overwrite_existing = true, schedule=TimeInterval(Δt_output_fld), global_attributes = config2dict(config))
 
 run!(simulation)
